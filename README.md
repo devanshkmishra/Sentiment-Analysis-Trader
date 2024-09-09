@@ -1,6 +1,8 @@
 # Financial News Sentiment Trading Bot
 
-Through this project I have demonstrated the integration of a PEFT fine-tuned **LLaMA 2 7B** model using QLoRA for **financial sentiment analysis** with an automated trading bot using **Lumibot** and **Alpaca API**. The bot pulls financial news from yFinance, analyzes sentiment (positive, neutral, or negative), and uses the results to inform trading decisions. The system is capable of backtesting these decisions using historical market data to evaluate the performance.
+In this project I have PEFT fine-tuned **LLaMA 2 7B** model using QLoRA for **financial sentiment analysis** and integrated it with an automated trading bot built using **Lumibot** and **Alpaca API**. The bot pulls financial news from yFinance, analyzes sentiment (positive, neutral, or negative), and uses the results to inform trading decisions. The system is capable of backtesting these decisions using historical market data to evaluate the performance.
+
+Try the Trading Bot here: [Google Colab Notebook Link](https://colab.research.google.com/drive/1VNgh9SzLJWpnlOX4_JtxqimZ1qQFkKl1?usp=sharing)
 
 [Click Here to access the Fine tuning Colab Notebook](https://colab.research.google.com/drive/1sZJM6sFJXD6ImOozROOZkUkngBN_g0NK?usp=sharing)
 
