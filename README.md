@@ -1,5 +1,7 @@
 # Financial News Sentiment Trading Bot
 
+![Result](https://i.imgur.com/9EZZhDR.png)
+
 In this project I have PEFT fine-tuned **LLaMA 2 7B** model using QLoRA for **financial sentiment analysis** and integrated it with an automated trading bot built using **Lumibot** and **Alpaca API**. The bot pulls financial news from yFinance, analyzes sentiment (positive, neutral, or negative), and uses the results to inform trading decisions. The system is capable of backtesting these decisions using historical market data to evaluate the performance.
 
 Try the Trading Bot here: [Google Colab Notebook Link](https://colab.research.google.com/drive/1VNgh9SzLJWpnlOX4_JtxqimZ1qQFkKl1?usp=sharing)
@@ -60,6 +62,15 @@ The fine-tuning process was performed using the following configurations:
 - The training was conducted over **3 epochs** with a warmup ratio of **0.03** and cosine learning rate scheduling.
 
 ## Results
+
+This graph shows the performance of the sentiment analysis based strategy compared to the SPY benchmark from 1 Jan 2020 to 1 April 2024. It can be seen that it performed much better than the benchmark until February 2022, but then it started falling due to some bad trades. 
+![Result](https://i.imgur.com/9EZZhDR.png)
+
+The primary purpose of this project was to try out an application of PEFT fine-tuned Llama 2 model, rather than trying to beat the index. Hence I did not explore ways to make this result better. 
+But I believe by using a better strategy along with trading on only those sentiment results which have a high confidence we would be able to beat the index using this model.
+
+![Metrics](https://i.imgur.com/Ya8QInW.png)
+
 
 The fine-tuned model achieves competitive accuracy in predicting sentiment, making it suitable for financial trading applications where understanding market sentiment is critical.
 
