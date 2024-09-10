@@ -63,7 +63,7 @@ The fine-tuning process was performed using the following configurations:
 
 ## Results
 
-This graph shows the performance of the sentiment analysis based strategy compared to the SPY benchmark from 1 Jan 2020 to 1 April 2024. It can be seen that it performed much better than the benchmark until February 2022, but then it started falling due to some bad trades. 
+This graph shows the performance of the sentiment analysis based strategy compared to the SPY benchmark from 1 Jan 2020 to 1 April 2024. It can be seen that it performed much better than the benchmark until February 2022, but then it started falling due to some bad trades. You can see the entire results from this trading period in the logs folder uploaded to this repo.
 ![Result](https://i.imgur.com/9EZZhDR.png)
 
 The primary purpose of this project was to try out an application of PEFT fine-tuned Llama 2 model, rather than trying to beat the index. Hence I did not explore ways to make this result better. 
