@@ -2,85 +2,126 @@
 
 ![Result](https://i.imgur.com/9EZZhDR.png)
 
-In this project I have PEFT fine-tuned **LLaMA 2 7B** model using QLoRA for **financial sentiment analysis** and integrated it with an automated trading bot built using **Lumibot** and **Alpaca API**. The bot pulls financial news from yFinance, analyzes sentiment (positive, neutral, or negative), and uses the results to inform trading decisions. The system is capable of backtesting these decisions using historical market data to evaluate the performance.
+This project fine-tunes a **LLaMA 2 7B** model with QLoRA for financial headline sentiment analysis and connects the model to a **Lumibot** strategy backed by the **Alpaca API**. The strategy reads recent market news, classifies it as positive, neutral, or negative, and uses that signal to trade **SPY** during backtests or Alpaca paper trading.
 
-Try the Trading Bot here: [Google Colab Notebook Link](https://colab.research.google.com/drive/1VNgh9SzLJWpnlOX4_JtxqimZ1qQFkKl1?usp=sharing)
+The goal is to demonstrate an end-to-end PEFT workflow for market sentiment, not to present a production trading system or financial advice.
 
-[Click Here to access the Fine tuning Colab Notebook](https://colab.research.google.com/drive/1sZJM6sFJXD6ImOozROOZkUkngBN_g0NK?usp=sharing)
+## Links
 
-[Click Here to see the fine tuned model repo on Huggingface](https://huggingface.co/Syrinx/llama-2-finance-sentiment)
+- Trading bot Colab: [open notebook](https://colab.research.google.com/drive/1VNgh9SzLJWpnlOX4_JtxqimZ1qQFkKl1?usp=sharing)
+- Fine-tuning Colab: [open notebook](https://colab.research.google.com/drive/1sZJM6sFJXD6ImOozROOZkUkngBN_g0NK?usp=sharing)
+- Fine-tuned model: [Syrinx/llama-2-finance-sentiment](https://huggingface.co/Syrinx/llama-2-finance-sentiment)
+- Saved result summary: [docs/BACKTEST_SUMMARY.md](docs/BACKTEST_SUMMARY.md)
 
-This repo also contains Logs of the Trading Strategy
+## What Is Included
 
-## Overview
+- `TradingBot.py`: import-safe CLI for running backtests or paper trading.
+- `Llama2_sentiment_finetune.ipynb`: fine-tuning notebook.
+- `TradingBot.ipynb`: original notebook workflow.
+- `logs/`: saved Lumibot backtest CSV and HTML artifacts.
+- `scripts/summarize_backtest.py`: utility for summarizing saved backtest logs.
+- `tests/`: fast unit tests for sentiment parsing, position sizing, config loading, and log summaries.
 
-- **Model Fine-Tuning**: 
-   - A **LLaMA 2 7B** model was fine-tuned using **QLoRA** on a dataset of financial news headlines on Kaggle using a P100 GPU, and the fine-tuning process took approximately 1.5 hours.
-   - The fine-tuning process utilized **LoRA** (Low-Rank Adaptation) to reduce memory requirements while maintaining performance.
-   - The fine-tuned model is quantized using **4-bit precision** for efficient deployment and inference.
-   - The training data was extracted from the **Financial PhraseBank** dataset, categorized into positive, neutral, and negative sentiments.
-   - The model was optimized for **causal language modeling (CAUSAL_LM)** to ensure it could predict sentiments based on new financial data inputs.
-   - This fine-tuned model was uploaded to Hugging Face under the repository [Syrinx/llama-2-finance-sentiment](https://huggingface.co/Syrinx/llama-2-finance-sentiment).
+## Setup
 
-- **Trading Bot**:
-   - Built with **Lumibot** and **Alpaca API**, the bot fetches live financial news from **yFinance** and passes it through the sentiment model.
-   - Based on the sentiment output, the bot takes appropriate trade actions (buy, sell, hold) on the stock market, specifically using the symbol **SPY** (S&P 500 ETF).
-   - The bot uses **YahooDataBacktesting** for backtesting trading strategies from historical data to evaluate performance.
+1. Create and activate a virtual environment:
 
-
-
-## Setup Instructions
-
-1. **Install Dependencies**:
    ```bash
-   pip install lumibot alpaca-trade-api timedelta transformers torch bitsandbytes
+   python3 -m venv .venv
+   source .venv/bin/activate
    ```
 
-2. **API Keys**:
-   - Get your **Alpaca API** keys from [Alpaca Markets](https://alpaca.markets/), and set them in the environment variables or directly in the script.
+2. Install dependencies:
 
-3. **Run Backtesting**:
-   - The bot is set up to run a backtest over historical data:
-     ```python
-     strategy.backtest(YahooDataBacktesting, start_date, end_date, parameters={"symbol": "SPY", "cash_at_risk": .5})
-     ```
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-4. **Live Trading** (optional):
-   - Uncomment the following code to enable live trading:
-     ```python
-     trader = Trader()
-     trader.add_strategy(strategy)
-     trader.run_all()
-     ```
+3. Configure Alpaca paper-trading credentials:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Then edit `.env` and export the variables before running the bot:
+
+   ```bash
+   export ALPACA_API_KEY=your_alpaca_paper_key
+   export ALPACA_API_SECRET=your_alpaca_paper_secret
+   export ALPACA_BASE_URL=https://paper-api.alpaca.markets/v2
+   ```
+
+## Run A Backtest
+
+```bash
+python TradingBot.py backtest \
+  --symbol SPY \
+  --cash-at-risk 0.5 \
+  --lookback-days 3 \
+  --start-date 2023-04-01 \
+  --end-date 2024-04-01
+```
+
+The script loads the Hugging Face model lazily, so importing `TradingBot.py` for tests or helper functions will not download model weights or contact Alpaca.
+
+## Run Paper Trading
+
+```bash
+python TradingBot.py live --symbol SPY --cash-at-risk 0.5
+```
+
+Use Alpaca paper credentials unless you have deliberately reviewed and changed the strategy for live trading risk.
+
+## Summarize Saved Logs
+
+```bash
+python scripts/summarize_backtest.py \
+  --stats logs/MLTrader_2024-09-10_07-09-27_stats.csv \
+  --trades logs/MLTrader_2024-09-10_07-30-58_trades.csv
+```
+
+The current saved logs summarize to:
+
+- Total return: 19.64%
+- Max drawdown: -47.68%
+- Filled trades: 96
+
+## Test
+
+```bash
+python3 -m unittest discover -s tests
+```
+
+The tests are intentionally lightweight and do not require Lumibot, Alpaca credentials, or the LLaMA model.
 
 ## Fine-Tuning Details
 
-The fine-tuning process was performed using the following configurations:
-- **LoRA (Low-Rank Adaptation)** with an alpha value of 16 and a dropout rate of 0.1.
-- Optimized with **PagedAdamW** and a learning rate of **2e-4**.
-- **Gradient Accumulation** to handle batch sizes and **Quantization (4-bit precision)** for efficient model handling.
-- The training was conducted over **3 epochs** with a warmup ratio of **0.03** and cosine learning rate scheduling.
+- Base model: **LLaMA 2 7B**
+- Adaptation method: **QLoRA / LoRA**
+- Dataset: Financial PhraseBank headlines labeled positive, neutral, and negative
+- Training hardware: Kaggle P100 GPU
+- Training duration: approximately 1.5 hours
+- LoRA alpha: 16
+- LoRA dropout: 0.1
+- Optimizer: PagedAdamW
+- Learning rate: 2e-4
+- Epochs: 3
+- Warmup ratio: 0.03
+- Scheduler: cosine
+- Quantization: 4-bit precision
 
-## Results
+## Model Evaluation
 
-This graph shows the performance of the sentiment analysis based strategy compared to the SPY benchmark from 1 Jan 2020 to 1 April 2024. It can be seen that it performed much better than the benchmark until February 2022, but then it started falling due to some bad trades. You can see the entire results from this trading period in the logs folder uploaded to this repo.
-![Result](https://i.imgur.com/9EZZhDR.png)
+The fine-tuned model achieved the following held-out sentiment results:
 
-The primary purpose of this project was to try out an application of PEFT fine-tuned Llama 2 model, rather than trying to beat the index. Hence I did not explore ways to make this result better. 
-But I believe by using a better strategy along with trading on only those sentiment results which have a high confidence we would be able to beat the index using this model.
-
-![Metrics](https://i.imgur.com/Ya8QInW.png)
-
-
-The fine-tuned model achieves competitive accuracy in predicting sentiment, making it suitable for financial trading applications where understanding market sentiment is critical.
-
-100%|██████████| 900/900 [03:51<00:00,  3.89it/s]
+```text
 Accuracy: 0.847
 Accuracy for label 0: 0.890
 Accuracy for label 1: 0.870
 Accuracy for label 2: 0.780
+```
 
-Classification Report:
+```text
               precision    recall  f1-score   support
 
            0       0.96      0.89      0.92       300
@@ -90,11 +131,18 @@ Classification Report:
     accuracy                           0.85       900
    macro avg       0.86      0.85      0.85       900
 weighted avg       0.86      0.85      0.85       900
+```
 
+Confusion matrix:
 
-Confusion Matrix:
+```text
 [[267  31   2]
  [ 10 261  29]
  [  1  65 234]]
+```
 
----
+## Results
+
+The saved strategy results compare the sentiment-based strategy against SPY between January 2020 and April 2024. The strategy outperformed early in the test window and later suffered from a sharp drawdown, which suggests the sentiment signal needs stronger confidence thresholds and risk management before serious use.
+
+![Metrics](https://i.imgur.com/Ya8QInW.png)
