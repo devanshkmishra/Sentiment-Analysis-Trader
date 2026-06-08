@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
@@ -22,6 +23,7 @@ DEFAULT_START_DATE = "2023-04-01"
 DEFAULT_END_DATE = "2024-04-01"
 DEFAULT_BASE_URL = "https://paper-api.alpaca.markets/v2"
 SENTIMENT_LABELS = ("positive", "neutral", "negative")
+SENTIMENT_PATTERN = re.compile(r"\b(positive|neutral|negative)\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -61,14 +63,50 @@ class AlpacaSettings:
         }
 
 
+@dataclass(frozen=True)
+class StrategyConfig:
+    """User-configurable strategy parameters."""
+
+    symbol: str = DEFAULT_SYMBOL
+    cash_at_risk: float = DEFAULT_CASH_AT_RISK
+    lookback_days: int = DEFAULT_LOOKBACK_DAYS
+
+    @classmethod
+    def from_args(cls, args: argparse.Namespace) -> "StrategyConfig":
+        return cls(
+            symbol=args.symbol,
+            cash_at_risk=args.cash_at_risk,
+            lookback_days=args.lookback_days,
+        ).validated()
+
+    def validated(self) -> "StrategyConfig":
+        symbol = self.symbol.strip().upper()
+        if not symbol:
+            raise ValueError("symbol must not be empty")
+        if not 0 < self.cash_at_risk <= 1:
+            raise ValueError("cash_at_risk must be greater than 0 and at most 1")
+        if self.lookback_days < 1:
+            raise ValueError("lookback_days must be at least 1")
+
+        return StrategyConfig(
+            symbol=symbol,
+            cash_at_risk=self.cash_at_risk,
+            lookback_days=self.lookback_days,
+        )
+
+    def as_parameters(self) -> dict[str, str | float | int]:
+        return {
+            "symbol": self.symbol,
+            "cash_at_risk": self.cash_at_risk,
+            "lookback_days": self.lookback_days,
+        }
+
+
 def normalize_sentiment(raw_text: str) -> str:
     """Extract a sentiment label from model output."""
 
-    lowered = raw_text.strip().lower()
-    for label in SENTIMENT_LABELS:
-        if label in lowered:
-            return label
-    return "none"
+    match = SENTIMENT_PATTERN.search(raw_text)
+    return match.group(1).lower() if match else "none"
 
 
 def majority_sentiment(sentiments: Iterable[str], default: str = "neutral") -> str:
@@ -133,7 +171,7 @@ class SentimentPredictor:
             f'"negative". [{headline}] = '
         )
         generated = self._load_pipeline()(prompt)
-        answer = generated[0]["generated_text"].split("=")[-1]
+        answer = generated[0]["generated_text"].rsplit("=", 1)[-1]
         return normalize_sentiment(answer)
 
     def predict_many(self, headlines: Sequence[str]) -> str:
@@ -222,33 +260,39 @@ def parse_date(value: str) -> datetime:
     return datetime.strptime(value, "%Y-%m-%d")
 
 
+def parse_date_range(start_date: str, end_date: str) -> tuple[datetime, datetime]:
+    start = parse_date(start_date)
+    end = parse_date(end_date)
+    if start >= end:
+        raise ValueError("start_date must be before end_date")
+    return start, end
+
+
+def create_strategy(strategy_class, broker, config: StrategyConfig):
+    return strategy_class(
+        name="mlstrat",
+        broker=broker,
+        parameters=config.as_parameters(),
+    )
+
+
 def run_backtest(args: argparse.Namespace) -> None:
     from lumibot.backtesting import YahooDataBacktesting
     from lumibot.brokers import Alpaca
 
+    config = StrategyConfig.from_args(args)
+    start_date, end_date = parse_date_range(args.start_date, args.end_date)
     settings = AlpacaSettings.from_environment()
     predictor = SentimentPredictor(model_path=args.model_path)
     strategy_class = create_strategy_class(settings, predictor)
     broker = Alpaca(settings.lumibot_credentials())
 
-    strategy = strategy_class(
-        name="mlstrat",
-        broker=broker,
-        parameters={
-            "symbol": args.symbol,
-            "cash_at_risk": args.cash_at_risk,
-            "lookback_days": args.lookback_days,
-        },
-    )
+    strategy = create_strategy(strategy_class, broker, config)
     strategy.backtest(
         YahooDataBacktesting,
-        parse_date(args.start_date),
-        parse_date(args.end_date),
-        parameters={
-            "symbol": args.symbol,
-            "cash_at_risk": args.cash_at_risk,
-            "lookback_days": args.lookback_days,
-        },
+        start_date,
+        end_date,
+        parameters=config.as_parameters(),
     )
 
 
@@ -256,19 +300,12 @@ def run_live(args: argparse.Namespace) -> None:
     from lumibot.brokers import Alpaca
     from lumibot.traders import Trader
 
+    config = StrategyConfig.from_args(args)
     settings = AlpacaSettings.from_environment()
     predictor = SentimentPredictor(model_path=args.model_path)
     strategy_class = create_strategy_class(settings, predictor)
     broker = Alpaca(settings.lumibot_credentials())
-    strategy = strategy_class(
-        name="mlstrat",
-        broker=broker,
-        parameters={
-            "symbol": args.symbol,
-            "cash_at_risk": args.cash_at_risk,
-            "lookback_days": args.lookback_days,
-        },
-    )
+    strategy = create_strategy(strategy_class, broker, config)
 
     trader = Trader()
     trader.add_strategy(strategy)
@@ -299,8 +336,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    args = build_parser().parse_args()
-    args.func(args)
+    parser = build_parser()
+    args = parser.parse_args()
+    try:
+        args.func(args)
+    except (RuntimeError, ValueError) as exc:
+        parser.error(str(exc))
 
 
 if __name__ == "__main__":
