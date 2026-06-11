@@ -2,21 +2,28 @@
 
 ![Result](https://i.imgur.com/9EZZhDR.png)
 
-This project fine-tunes a **LLaMA 2 7B** model with QLoRA for financial headline sentiment analysis and connects the model to a **Lumibot** strategy backed by the **Alpaca API**. The strategy reads recent market news, classifies it as positive, neutral, or negative, and uses that signal to trade **SPY** during backtests or Alpaca paper trading.
+This project fine-tunes an instruction model with QLoRA for financial headline
+sentiment analysis and connects the model to a **Lumibot** strategy backed by
+the **Alpaca API**. The current training pipeline defaults to
+**Qwen3 4B Instruct**, while the published historical checkpoint uses
+**Llama 2 7B**. The strategy reads recent market news, classifies it as
+positive, neutral, or negative, and uses that signal to trade **SPY** during
+backtests or Alpaca paper trading.
 
 The goal is to demonstrate an end-to-end PEFT workflow for market sentiment, not to present a production trading system or financial advice.
 
 ## Links
 
 - Trading bot Colab: [open notebook](https://colab.research.google.com/drive/1VNgh9SzLJWpnlOX4_JtxqimZ1qQFkKl1?usp=sharing)
-- Fine-tuning Colab: [open notebook](https://colab.research.google.com/drive/1sZJM6sFJXD6ImOozROOZkUkngBN_g0NK?usp=sharing)
-- Fine-tuned model: [Syrinx/llama-2-finance-sentiment](https://huggingface.co/Syrinx/llama-2-finance-sentiment)
+- Current fine-tuning notebook: [`Qwen3_sentiment_finetune.ipynb`](Qwen3_sentiment_finetune.ipynb)
+- Historical fine-tuned model: [Syrinx/llama-2-finance-sentiment](https://huggingface.co/Syrinx/llama-2-finance-sentiment)
 - Saved result summary: [docs/BACKTEST_SUMMARY.md](docs/BACKTEST_SUMMARY.md)
 
 ## What Is Included
 
 - `TradingBot.py`: import-safe CLI for running backtests or paper trading.
-- `Llama2_sentiment_finetune.ipynb`: fine-tuning notebook.
+- `finetune_sentiment.py`: reproducible QLoRA training and evaluation CLI.
+- `Qwen3_sentiment_finetune.ipynb`: small GPU-notebook entry point for the CLI.
 - `TradingBot.ipynb`: original notebook workflow.
 - `logs/`: saved Lumibot backtest CSV and HTML artifacts.
 - `scripts/summarize_backtest.py`: utility for summarizing saved backtest logs.
@@ -35,6 +42,12 @@ The goal is to demonstrate an end-to-end PEFT workflow for market sentiment, not
 
    ```bash
    pip install -r requirements.txt
+   ```
+
+   For model fine-tuning on a CUDA machine, install the training extras instead:
+
+   ```bash
+   pip install -r requirements-finetune.txt
    ```
 
 3. Configure Alpaca paper-trading credentials:
@@ -94,25 +107,53 @@ python3 -m unittest discover -s tests
 
 The tests are intentionally lightweight and do not require Lumibot, Alpaca credentials, or the LLaMA model.
 
-## Fine-Tuning Details
+## Fine-Tune A Model
 
-- Base model: **LLaMA 2 7B**
-- Adaptation method: **QLoRA / LoRA**
-- Dataset: Financial PhraseBank headlines labeled positive, neutral, and negative
-- Training hardware: Kaggle P100 GPU
-- Training duration: approximately 1.5 hours
-- LoRA alpha: 16
-- LoRA dropout: 0.1
-- Optimizer: PagedAdamW
-- Learning rate: 2e-4
-- Epochs: 3
-- Warmup ratio: 0.03
-- Scheduler: cosine
-- Quantization: 4-bit precision
+Run on a CUDA GPU:
 
-## Model Evaluation
+```bash
+python finetune_sentiment.py \
+  --model-name Qwen/Qwen3-4B-Instruct-2507 \
+  --dataset-config sentences_allagree \
+  --output-dir artifacts/qwen3-finance-sentiment
+```
 
-The fine-tuned model achieved the following held-out sentiment results:
+The default pipeline provides:
+
+- An ungated, Apache-2.0 **Qwen3 4B Instruct** base model.
+- The Hugging Face `takala/financial_phrasebank` dataset without manual uploads.
+- Deterministic, label-stratified train, validation, and test splits.
+- 4-bit NF4 quantization with double quantization and bf16 where supported.
+- LoRA across linear layers, gradient checkpointing, and paged AdamW.
+- Best-checkpoint selection using validation loss.
+- Greedy exact-label test evaluation with accuracy, macro F1, per-label metrics,
+  and invalid-output counts saved to `test_metrics.json`.
+- A saved `training_config.json` for reproducibility.
+
+Useful overrides:
+
+```bash
+# More examples with lower annotator agreement
+python finetune_sentiment.py --dataset-config sentences_75agree
+
+# Lower-memory GPU
+python finetune_sentiment.py \
+  --batch-size 1 \
+  --gradient-accumulation-steps 16
+
+# Try another compatible causal instruction model
+python finetune_sentiment.py --model-name Qwen/Qwen2.5-3B-Instruct
+```
+
+The adapter and tokenizer are written to `--output-dir`. The historical trading
+bot continues to default to the published Llama 2 checkpoint; pass
+`--model-path` to backtest a merged or published replacement model.
+
+## Historical Model Evaluation
+
+The original Llama 2 fine-tuning run reported the following held-out sentiment
+results. These are retained for reference and are not claims about the new
+Qwen3 pipeline until a new training run is completed:
 
 ```text
 Accuracy: 0.847
