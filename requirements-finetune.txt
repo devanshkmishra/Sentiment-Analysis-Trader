@@ -1,0 +1,9 @@
+-r requirements.txt
+
+# QLoRA training stack. Install on a CUDA machine or GPU notebook.
+accelerate>=1.6,<2
+bitsandbytes>=0.45,<1
+datasets>=3.6,<5
+peft>=0.15,<1
+tensorboard>=2.18,<3
+trl>=0.19,<1
