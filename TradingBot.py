@@ -137,6 +137,21 @@ def calculate_quantity(cash: float, cash_at_risk: float, last_price: float) -> i
     return math.floor(cash * cash_at_risk / last_price)
 
 
+def extract_headlines(news_items: Iterable[object]) -> list[str]:
+    """Extract non-empty headlines from Alpaca news objects."""
+
+    headlines = []
+    for item in news_items:
+        headline = getattr(item, "headline", None)
+        if not headline:
+            raw = getattr(item, "_raw", None)
+            if isinstance(raw, dict):
+                headline = raw.get("headline")
+        if isinstance(headline, str) and headline.strip():
+            headlines.append(headline.strip())
+    return headlines
+
+
 class SentimentPredictor:
     """Lazy wrapper around the Hugging Face text-generation pipeline."""
 
@@ -218,7 +233,7 @@ def create_strategy_class(settings: AlpacaSettings, predictor: SentimentPredicto
         def get_sentiment(self):
             today, prior = self.get_dates()
             news = self.api.get_news(symbol=self.symbol, start=prior, end=today)
-            headlines = [event.__dict__["_raw"]["headline"] for event in news]
+            headlines = extract_headlines(news)
             return predictor.predict_many(headlines)
 
         def on_trading_iteration(self):

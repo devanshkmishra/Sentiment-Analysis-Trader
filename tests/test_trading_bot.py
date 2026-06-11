@@ -1,12 +1,14 @@
 import os
 import unittest
 from argparse import Namespace
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from TradingBot import (
     AlpacaSettings,
     StrategyConfig,
     calculate_quantity,
+    extract_headlines,
     majority_sentiment,
     normalize_sentiment,
     parse_date,
@@ -33,6 +35,19 @@ class SentimentHelpersTest(unittest.TestCase):
     def test_majority_sentiment_defaults_for_ties_and_empty_inputs(self):
         self.assertEqual(majority_sentiment(["positive", "negative"]), "neutral")
         self.assertEqual(majority_sentiment([]), "neutral")
+
+    def test_extract_headlines_supports_public_and_raw_news_fields(self):
+        news = [
+            SimpleNamespace(headline=" Public headline "),
+            SimpleNamespace(_raw={"headline": "Raw headline"}),
+            SimpleNamespace(headline=""),
+            SimpleNamespace(_raw={}),
+        ]
+
+        self.assertEqual(
+            extract_headlines(news),
+            ["Public headline", "Raw headline"],
+        )
 
 
 class PositionSizingTest(unittest.TestCase):
