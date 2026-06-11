@@ -7,6 +7,7 @@ backtests until one of the CLI commands is executed.
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import re
 from collections import Counter
@@ -133,7 +134,7 @@ def calculate_quantity(cash: float, cash_at_risk: float, last_price: float) -> i
     if last_price <= 0:
         raise ValueError("last_price must be greater than 0")
 
-    return int(round(cash * cash_at_risk / last_price, 0))
+    return math.floor(cash * cash_at_risk / last_price)
 
 
 class SentimentPredictor:

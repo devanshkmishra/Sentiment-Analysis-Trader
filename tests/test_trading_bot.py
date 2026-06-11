@@ -37,7 +37,16 @@ class SentimentHelpersTest(unittest.TestCase):
 
 class PositionSizingTest(unittest.TestCase):
     def test_calculate_quantity_uses_whole_shares(self):
-        self.assertEqual(calculate_quantity(cash=10_000, cash_at_risk=0.5, last_price=432), 12)
+        self.assertEqual(calculate_quantity(cash=10_000, cash_at_risk=0.5, last_price=432), 11)
+
+    def test_calculate_quantity_never_exceeds_cash_at_risk(self):
+        cash = 1_000
+        cash_at_risk = 0.5
+        last_price = 140
+
+        quantity = calculate_quantity(cash, cash_at_risk, last_price)
+
+        self.assertLessEqual(quantity * last_price, cash * cash_at_risk)
 
     def test_calculate_quantity_rejects_invalid_inputs(self):
         with self.assertRaises(ValueError):
