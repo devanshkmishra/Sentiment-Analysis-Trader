@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -45,6 +46,9 @@ def read_filled_trades(path: Path) -> list[dict[str, str]]:
 
 
 def max_drawdown(values: list[float]) -> float:
+    if not values:
+        raise ValueError("At least one portfolio value is required")
+
     peak = values[0]
     drawdown = 0.0
     for value in values:
@@ -54,12 +58,33 @@ def max_drawdown(values: list[float]) -> float:
     return drawdown
 
 
+def parse_portfolio_values(stats: list[dict[str, str]], path: Path) -> list[float]:
+    values = []
+    for row_number, row in enumerate(stats, start=2):
+        raw_value = row["portfolio_value"]
+        try:
+            value = float(raw_value)
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid portfolio value on row {row_number} of {path}: {raw_value!r}"
+            ) from exc
+        if not math.isfinite(value) or value < 0:
+            raise ValueError(
+                f"Portfolio value must be finite and non-negative on row "
+                f"{row_number} of {path}"
+            )
+        values.append(value)
+    return values
+
+
 def summarize(stats_path: Path, trades_path: Path) -> BacktestSummary:
     stats = read_stats(stats_path)
     trades = read_filled_trades(trades_path)
-    values = [float(row["portfolio_value"]) for row in stats]
+    values = parse_portfolio_values(stats, stats_path)
     starting_value = values[0]
     ending_value = values[-1]
+    if starting_value == 0:
+        raise ValueError("Starting portfolio value must be greater than zero")
     total_return = (ending_value - starting_value) / starting_value
     buy_fills = sum(1 for row in trades if row.get("side") == "buy")
     sell_fills = sum(1 for row in trades if row.get("side") == "sell")

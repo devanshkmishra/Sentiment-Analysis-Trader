@@ -63,6 +63,30 @@ class BacktestSummaryTest(unittest.TestCase):
         self.assertIn("# Backtest Summary", rendered)
         self.assertIn("Total return: 0.00%", rendered)
 
+    def test_summarize_rejects_zero_starting_value(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stats_path = root / "stats.csv"
+            trades_path = root / "trades.csv"
+            stats_path.write_text(
+                "datetime,portfolio_value\n2024-01-01,0\n2024-01-02,100\n"
+            )
+            trades_path.write_text("status,filled_quantity,side\n")
+
+            with self.assertRaisesRegex(ValueError, "must be greater than zero"):
+                summarize(stats_path, trades_path)
+
+    def test_summarize_reports_invalid_portfolio_values(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            stats_path = root / "stats.csv"
+            trades_path = root / "trades.csv"
+            stats_path.write_text("datetime,portfolio_value\n2024-01-01,unknown\n")
+            trades_path.write_text("status,filled_quantity,side\n")
+
+            with self.assertRaisesRegex(ValueError, "Invalid portfolio value on row 2"):
+                summarize(stats_path, trades_path)
+
 
 if __name__ == "__main__":
     unittest.main()
